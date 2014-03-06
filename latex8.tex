@@ -20,7 +20,7 @@
 %------------------------------------------------------------------------- 
 \begin{document}
 
-\title{PADI - DSTM}
+\title{PADI-DSTM}
 
 
 
@@ -36,7 +36,9 @@
 %------------------------------------------------------------------------- 
 \Section{Solution Overview}
 
-
+For solving the problem stated in the scope of this work, our approach will be divided in three components.
+The first component, a centralized master, that stores meta-data concerning every data object existing in PADI-DSTM, such as location or uid, and it is responsible for mediating the creation and access to the PADInt objects. The second one, the transactional servers will store and execute the changes made to the data objects, acting as participants of a distributed transaction protocol. Finally, clients will execute the programs that use the PADI-DSTM library, invoking the creation/access to the objects and manipulating them. Clients will also, through the PADI-DSTM library, act as coordinators for the transactions they trigger. One of the main concerns of this work is trying to implement the system in a decentralized way, minimizing the interaction with centralized entities. For doing so, it considers client as the transaction coordinator, in contrast with master, once it is assumed clients never crash. The interactions with the master server will be only for creating and accessing data objects.
+The system will consider a fault model which tolerates one silent failure. For doing so, it implements an active replication protocol with 3 replicas. The system will follow a two-phase commit protocol for executing the transactions, which, as mentioned before, will take as coordinator the transaction client, and as participants the servers which hold the involved data objects. The next sections will expose the systems behavior with more detail. 
 
 %------------------------------------------------------------------------- 
 \SubSection{Architecture}
@@ -49,6 +51,7 @@ Our PADI-DSTM library contains multiple data structures with different goals. In
 
 %------------------------------------------------------------------------- 
 \SubSection{Responsibilities}
+
 
 %------------------------------------------------------------------------ 
 \SubSection{Concurrency Control}
@@ -67,7 +70,6 @@ Bearing in mind that we're using timestamps to prevent concurrent access to shar
 
 %------------------------------------------------------------------------- 
 
-\nocite{ex1,ex2}
 \bibliographystyle{latex8}
 \bibliography{latex8}
 
