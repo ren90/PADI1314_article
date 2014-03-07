@@ -35,18 +35,23 @@
 
 %------------------------------------------------------------------------- 
 \Section{Solution Overview}
+%DONE RENATO
 
-For solving the problem stated in the scope of this work, our approach will be divided in three components.
-The first component, a centralized master, that stores meta-data concerning every data object existing in PADI-DSTM, such as its location or uid, and it is responsible for mediating the creation and access to the PADInt objects. The second one, the transactional servers will store and execute the changes made to the data objects, acting as participants of a distributed transaction protocol. Finally, clients will execute the programs that use the PADI-DSTM library, invoking the creation/access to the objects and manipulating them. Clients will also, through the PADI-DSTM library, act as coordinators for the transactions they trigger. One of the main concerns of this work is trying to implement the system in a decentralized way, minimizing the interaction with centralized entities. For doing so, it considers client as the transaction coordinator, in contrast with master, once it is assumed clients never crash. The interactions with the master server will be only for creating and accessing data objects.
-The system will consider a fault model which tolerates one silent failure. For doing so, it implements an active replication protocol with 3 replicas. The system will follow a two-phase commit protocol for executing the transactions, which, as mentioned before, will take as coordinator the transaction client, and as participants the servers which hold the involved data objects. The next sections will expose the systems behavior with more detail.  
+This work focuses on implementing a transactional shared memory system, which stores variables of PADInt type. These will be located in a set of transactional servers, that replicate information in case of failure occurrence. Clients, recurring to the PADI-DSTM library, create and access variables through a master server, which maintains information about the location of each one of them. Once accessed, clients can execute read and write operations on variables. One of the main concerns of this work is trying to implement the system in a decentralized way, minimizing the interaction with centralized entities. For doing so, it considers client as the transaction coordinator, in contrast with master, once it is assumed clients never crash. The interactions with the master server will be only for creating and accessing data objects. The system will consider a fault model which tolerates one silent failure. For doing so, it implements an active replication protocol with 3 replicas. The system will follow a two-phase commit protocol for executing the transactions, which, as mentioned before, will take as coordinator the transaction client, and as participants the servers which hold the involved data objects. Finally, the master server will be able to mediate the load between transactional servers, favoring the systems scalability. The next sections will expose the systems behavior with more detail.  
 
 %------------------------------------------------------------------------- 
 \SubSection{Architecture}
 
+%TODO: RENATO
+%olhe la...isto nao sao as responsibilities????
 
+
+For solving the problem stated in the scope of this work, our approach will be divided in three components.
+The first component, a centralized master, that stores meta-data concerning every data object existing in PADI-DSTM, such as its location or uid, and it is responsible for mediating the creation and access to the PADInt objects. It is also the one who executes the load balancing algorithm, coordinating and re-allocating resources. The second one, the transactional servers will store and execute the changes made to the data objects, acting as participants of a distributed transaction protocol. Finally, clients will execute the programs that use the PADI-DSTM library, invoking the creation/access to the objects and manipulating them. Clients will also, through the PADI-DSTM library, act as coordinators for the transactions they trigger. 
 
 %------------------------------------------------------------------------- 
 \SubSection{Data Structures}
+
 Our PADI-DSTM library contains multiple data structures with different goals. In the Master server are stored the list of transactions unique identifiers that started and ended, in order to have a log of the transactions that have been completed, and if one transaction id only exists in the list of started transactions, this means that the transaction has been aborted. The servers continually send "I'm alive" messages to the Master which updates a list that contains the active servers, and when the client connects with the Master by calling the methods AccessPadInt or CreatePadInt, the Master only returns the active servers in the object that contains the PadInt. This PadInt object is the main one in our architecture, it is stored in the servers, and each PadInt exists in three servers, in order to tolerate faults. Each of the three objects is always updated to the last version, because when the changes to the object are committed, the new values are propagated to the other servers in which the object is stored. The PadInt object contains different sub-objects, its UID (to make each PadInt unique), its value, an array of the servers in which it is stored (we decided that each object know its own location, and the client decides which one to bind to, when he receives the object through the API). The PadInt object also contains a timestamp that it is used to control the accesses to the variable in the memory, in this case if the client timestamp is lower than the timestamp of the object it means that the client has an old version of the object and the transaction is aborted.
 
 %------------------------------------------------------------------------- 
@@ -61,8 +66,14 @@ To manage this type of concurrency, we will be using timestamp-based concurrency
 %------------------------------------------------------------------------- 
 \SubSection{Transactional Algorithms}
 
+%TODO: RENATO
+
+
+
 %------------------------------------------------------------------------- 
 \SubSection{Distributed Protocols}
+
+%TODO: RENATO
 
 %------------------------------------------------------------------------- 
 \SubSection{Deadlock Detection and Abort Recovery}
