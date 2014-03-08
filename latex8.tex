@@ -30,8 +30,7 @@
 
 %------------------------------------------------------------------------- 
 \Section{Introduction}
-Since the beggining of the computer revolution in the world, the distributed systems have played a major role in the technologies inovation and developement, and in the recent years we have been witnessing a new era in the technology, the Cloud era. Today the Cloud is the new "big thing" in the computers and mobile devices, everyone can acess everything  everywhere! As such the transactional shared memory system are increasingly important in the technologies world. Due to this evolution the PADI-DSTM appeared, this library intends to manage the transactions between objects in a shared memory system, and avoid all the problems related to the distributed systems and transactions.
-
+Since the beginning of the computer revolution in the world, the distributed systems have played a major role in the technologies' innovation and development, and in the recent years we have been witnessing a new era in the technology, the Cloud era. Today the Cloud is the new "big thing" in computers and mobile devices, everyone can access everything  everywhere! As such, the transactional shared memory systems are increasingly important in the world of technology. Due to this evolution, the PADI-DSTM appeared, a library that is intended to manage the transactions between objects in a shared memory system, and avoid all the problems related to the distributed systems and transactions.
 
 %------------------------------------------------------------------------- 
 \Section{Solution Overview}
@@ -62,6 +61,7 @@ Our PADI-DSTM library contains multiple data structures with different goals. In
 \SubSection{Concurrency Control}
 With a distributed system, there's a problem that is inherent to this type of architecture: concurrent access to shared objects. In this particular case, we have to take into consideration that objects can be accessed by multiple clients and, when committing the changes, the objects may be accessed by several servers as well.
 To manage this type of concurrency, we will be using timestamp-based concurrency control. This type of approach assigns a timestamp (which can be a time value or a sequence number) to the transactions that want to have access over a certain object. This object also keeps a timestamp of its own and also keeps track of the latest transaction that read/wrote the object's value. With this kind of approach, the transactions are forced, in a sense, to access the object in a specific order, so that there are no actual parallel accesses.
+One aspect that is important to mention is that there is still a lock on the object that is being accessed, though this is not a "fully grown" lock as it would be in database lock-based concurrency control. The lock is to prevent concurrent access to an object, though the time the lock is locked is significantly smaller and there is no chance of deadlocking since the lock is immediately released when it's no longer needed, as opposed to lock-based concurrency control in which the locks are released at the end of the transaction.
 
 %------------------------------------------------------------------------- 
 \SubSection{Transactional Algorithms}
