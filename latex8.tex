@@ -63,14 +63,48 @@ One aspect that is important to mention is that there is still a lock on the obj
 %------------------------------------------------------------------------- 
 \SubSection{Transactional Algorithms}
 
-%TODO: RENATO
 
+For guaranteeing the conformity with ACID properties, our solution will implement a transaction protocol between the servers involved in an operation. It implements a slight variation of a Two-phase commit protocol(2PC), where the client plays the role of coordinator, and the transactional servers act as participants. Taking the client machine as the transaction coordinator is possible since we can assume (i) the clients don't crash, (ii) client and transactional servers are the only ones who are involved in a given transaction. This way our solution avoids the bottleneck ov centralizing the coordination on the master server. On the other hand, if the coordination task was given to another unrelated transactional server, it could lead to protocol deadlocks, since it is assumed transactional servers can crash.
+The protocol initiates calling beginTx() operation, which launches a coordination object in the client, through the PADI-DSTM library. This object has an endpoint with a given address, and creates a transaction identifier (tid). Each operation executed on each of transactional server will carry the tid and address of coordination endpoint so that they join the current transaction. Once all servers are joined, the protocol carries out through the following two phases.
+\begin{itemize}
+
+\item[--] Phase one: Voting
+
+\begin{enumerate}
+	
+\item The coordinator send a \emph{prepare} message to each participant.
+
+\item Basing on the operation viability, each participant replies \emph{yes} or \emph{no} to the prepare request. In affirmative case, it prepares to commit saves objects into partition storage. In case of a negative answer, it has to completely abort the transaction.
+
+\end{enumerate}
+
+\item[--] Phase two: Deciding
+
+\begin{enumerate}
+
+\item The coordinator decides whether the transaction commits or aborts basing on the votes returned from participants. If all the participants vote to commit, and no failure has occurred, the coordinator decides to commit the transaction and sends a \emph{doCommit} request to every participant. In case of any participant vote to abort, the coordinator signals all the participants to abort the transaction. 
+
+\item The participants receive a response from coordinator and do whatever it prescribes them to do (commit or abort). In case of a \emph{doCommit} participant returns a \emph{haveCommited} call to inform the coordinator that the transaction is finished. In case of abort, they simply abort the transaction.
+
+
+\end{enumerate}
+
+\end{itemize}
+
+Once its assumed that transactional servers can crash and the network can delay the delivery of messages, the protocol peers (coordinator and participants) are required to limit the time they wait for a response. Therefore, the protocol implements a series of timeout procedures in order to avoid situations where the peers wait indefinitely. 
+Firstly, consider the situation where the participant voted \emph{yes} and is waiting for a decision from the coordinator. Since this is assumed as not crashing, the only reason the participant can wait a long period of time is due to a network delay. For resolving this issue, the participant, in presence of a similar situation, must inquiry the coordinator for a decision (through a \emph{getDecision} call). The coordinator then replies and the participant gets its decision.
+The second situation related to the phase where the coordinator waits for the votes from all the participants. If one or more of these servers crash or gets a network delay, the coordinator must not wait indefinitely. In this case, it counts down a timer. Once it reaches timeout, the coordinator sends \emph{doAbort} messages to all the transaction participants.
+
+
+%Porque o client?
+%protocolo
+%timeouts
 
 
 %------------------------------------------------------------------------- 
 \SubSection{Distributed Protocols}
 
-%TODO: RENATO
+%TODO: DELTAS
 
 %------------------------------------------------------------------------- 
 \SubSection{Deadlock Detection and Abort Recovery}
