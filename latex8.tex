@@ -45,15 +45,50 @@ This work focuses on implementing a transactional shared memory system, which st
 %------------------------------------------------------------------------- 
 \SubSection{Data Structures}
 
-Our PADI-DSTM library contains multiple data structures with different goals. In the Master server are stored the list of transactions unique identifiers that started and ended, in order to have a log of the transactions that have been completed, and if one transaction id only exists in the list of started transactions, this means that the transaction has been aborted. The servers continually send  heartbeats messages("I'm alive") to the Master which updates a list that contains the active servers, and when the client connects with the Master by calling the methods AccessPadInt or CreatePadInt, the Master only returns the active servers in the object that contains the PadInt. In heartbeats messages the servers also include the number of active connections at the time, in order to the master know which servers have a greater number of connections and when a client requests the servers to the master, the master only returns the ones with less number of connections.  
+Our PADI-DSTM library contains multiple types of data structures in the different components of the system, each component has it's own structures, with different goals, and the main structure is the PADInt, which is used by the different components.
 
-The PadInt object is the main one in our architecture, it is stored in the servers, and each PadInt exists in three servers, in order to tolerate faults. Each of the three objects is always updated to the last version, because when the changes to the object are committed, the new values are propagated to the other servers in which the object is stored. The PadInt object contains different sub-objects, its UID (to make each PadInt unique), its value, an array of the servers in which it is stored (we decided that each object knows its own location, and the client decides which one to bind to, when he receives the object through the API). The PadInt object also contains a timestamp that it is used to control the accesses to the variable in the memory, in this case if the client's timestamp is lower than the timestamp of the object it means that the client has an old version of the object and the transaction is aborted.
+First of all the Master server, it contains a few structures: the list of the servers that are active, which is constantly being updated, because the servers are sending heartbeat messages to the master, so that the master can refresh the servers list,and that list will be used for the load balancing algorithm, which will be explained later. The master also contains a table with the servers locations of each PADInt, so that when the clients contacts the master by AcessPadInt method, the master only have to access the table with the PadInt uid, and give the servers URLs to the client, and he contacts the servers to get a remote reference to the object. When a client makes a CreatePadint request to the master, it only have to generate, with the load balancing algorithm,the 3 servers in which the PADInt will be stored, and add the pair (uid, servers) to the table of locations. The Master is also the one who generate the timestamps and IDs for the transactions, so when a client wants to make a transaction he have to request the "transaction context" to the master, in this case, the client receives a transaction ID, timestamp, and when starts to commit the client also have to request the URL of coordinator for the 2PC protocol, which is a server chosen by the master. For having a log of the transactions the master also stores the transaction ids that have started, and have finished, , this implies that if one transaction id only exists in the list of started transactions, this means that the transaction has been aborted or is in course.
+
+
 
 \begin{figure}[h!]
-	\centering
-	\includegraphics[scale=0.4]{Client-Master.png}
-	\caption{Diagram to show client requests to master and servers heartbeat messages to  master}
+
+\centering
+
+\includegraphics[scale=0.4]{Client-Master.png}
+
+\caption{Diagram to show client requests to master and servers heartbeat messages to master}
+
 \end{figure}
+
+
+
+The transactional servers main structures, is obviously the list of the PADInts, and the pending requests, this list is the one where are stored the request made to the server, if the server is in a Freeze state, so when the server recovers, the server goes to this list and run every request that was made.
+
+
+
+The PadInt object is the main one in our architecture, it is stored in the transactional servers, and each PadInt exists in three servers, in order to tolerate faults. Each of the three objects is always updated to the last version, because when the changes to the object are committed, the new values are propagated to the other servers in which the object is stored. The PadInt object contains different sub-objects, its UID (to make each PadInt unique), its value, an array of the servers in which it is stored (we decided that each object know its own location. The PadInt object also contains a timestamp that it is used to control the accesses to the variable in the memory, in this case if the client timestamp is lower than the timestamp of the object it means that the client has an old version of the object and the transaction is aborted. The Padint also contains a list of temporary values, that are being modified by the clients, that are stored by the transaction ID. When the library receives the remote object from the master, from a CreatePadInt or an AccessPadInt request made by the client, the library creates a new structure that in fact is a local copy of the PadInt, in which stores the three remote references, for the ``real PadInt'' in the transactional servers, and gives that local copy to the client, which in fact is modifying the copy and not the remote object, so when the client makes a commit request, the servers access it's own the PadInts involved in the transaction and transfers the values from the temporary list, that are stored by transactions ID, to the real value of the PADInt, and stores the old value in case of need to make rollback if the transaction fails.
+
+
+
+\begin{figure}[h!]
+
+\centering
+
+\includegraphics[scale=0.4]{Padint.png}
+
+\caption{Structure of Padint local copy}
+
+\end{figure}
+
+
+
+\SubSection{Load Balancing}
+
+The balancing of the system is always made in the creation of PADInts, when the master receives a CreatePadint request, it calls the function for selecting the servers that will be given to the PADI-DSTM library. That function calculates the number of PADInts that are stored in each server, with the information of the active servers and the PADInts locations that are stored in the Master server. This function always chose the 3 servers that have less number of PADInts, and is always executed when a new creation request arrives, so the balancing is always assured, because all the servers should have similar number of objects, and the chosen ones are three with less number of Padints. This implicitly leads to another advantage, the number of connections is balanced too, because the servers that are given from the master are the ones with less load, and theoretically with less number of connections.
+
+After the balancing calculation the servers that were chosen are given to the PADI-DSTM library, that will create a connection to servers and request the creation of the PADInt.
+
 
 %------------------------------------------------------------------------- 
 \SubSection{Responsibilities}
@@ -119,8 +154,7 @@ The second situation related to the phase where the coordinator waits for the vo
 %------------------------------------------------------------------------- 
 \SubSection{Distributed Protocols}
 
-As indicated above, our approach will take into account the problem of overloading servers, in this case, the problem is that, at certain point in time, it is possible that some servers will have greater load than others, or if new servers connect to the master, those servers will be empty, and the others can be full, and because they have all the objects, the requests will be always made to the loaded servers, while the new ones remain empty. To solve the problem our solution will be divided in three parts: the first part is that the master will have a registry of the objects' locations, so the master can always see which servers have greater load; in the second part of the solution, the master, as mentioned above, will receive heartbeat messages, which will alert the master of which servers are still active, and the number of connections at the time, with that information the master will update his registry of the active servers and connections of that servers, and when a new client requests the server to some object the master will try to give him the less loaded server with less number of connections, if possible. And the third part of the solution is that our master server will have a timer, that from time to time activates a trigger, and when that happens, a special type of transaction will occur. In that special transaction the master will see, in his list of servers and locations, which servers are more loaded, and transfer part of the data to servers that are less loaded, after transferring the data, the master will update the location of the objects in his registries, so that when a client request the access to some PadInt he always receives the new location, and not the reference to the object previous location.
-
+As indicated above, our approach will take into account the problem of overloading servers, in this case, the problem is that, at certain point in time, it is possible that some servers will have greater load than others, or if new servers connect to the master, those servers will be empty, and the others can be full, and because they have all the objects, the requests will be always made to the loaded servers, while the new ones remain empty. To solve the problem our solution will be divided in two parts: the first part is that the master will have a registry of the objects' locations, so the master can always see which servers have greater load; in the second part of the solution, the master, as mentioned above, will receive heartbeat messages, which will alert the master of which servers are still active, and the number of connections at the time, with that information the master will update his registry of the active servers and connections of that servers, and when a new client requests the server to some object the master will try to give him the less loaded server with less number of connections, if possible. 
 
 Regarding the replication aspect of our solution, we have an active replication protocol. This protocol is applied during the creation of a PADInt and, when a transaction commits successfully, the process of updating the PADInt's replicas, to keep the data consistency.
 When a client creates a PADInt, the master returns to the DSTMLib three servers (with the least amount of PADInts), where the PADInt will be stored (further explanation of the algorithm is addressed in the section ""). For the update part, since the PADInt holds a list of its replicas, when a transaction commits, the replicas are updated right after the "original" PADInt, thus keeping the data consistent.
